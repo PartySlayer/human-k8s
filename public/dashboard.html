@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>K8s Cluster View</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <style>
+        :root {
+            --bg-color: #1a1a1a;
+            --green: #4caf50;
+            --red: #f44336;
+            --text: #ffffff;
+        }
+        body {
+            background-color: var(--bg-color);
+            color: var(--text);
+            font-family: 'Courier New', monospace;
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            overflow: hidden;
+            transition: background-color 0.5s;
+        }
+
+        /* --- RED ALERT ANIMATION --- */
+        @keyframes redAlertPulse {
+            0% { background-color: #3f0000; }
+            50% { background-color: #800000; }
+            100% { background-color: #3f0000; }
+        }
+        body.critical-alert {
+            animation: redAlertPulse 1.5s infinite ease-in-out;
+        }
+        body.critical-alert .sla-label, 
+        body.critical-alert #cluster-grid {
+            /* Mantiene leggibilità */
+            text-shadow: 0 0 10px #000; 
+        }
+
+        /* HEADER & SLA */
+        header {
+            padding: 20px;
+            background: rgba(0,0,0,0.8);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 2px solid #333;
+            height: 100px;
+            z-index: 10;
+        }
+        .sla-container {
+            flex-grow: 1;
+            margin: 0 40px;
+        }
+        .sla-label {
+            font-size: 2.5rem;
+            font-weight: bold;
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 10px;
+        }
+        .sla-bar-bg {
+            height: 40px;
+            background: #333;
+            border-radius: 5px;
+            overflow: hidden;
+        }
+        .sla-bar-fill {
+            height: 100%;
+            background-color: var(--green);
+            width: 100%;
+            transition: width 0.3s ease-out, background-color 0.5s ease;
+        }
+
+        /* GRID SYSTEM */
+        #cluster-grid {
+            padding: 20px;
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+            gap: 15px;
+            overflow-y: auto;
+            flex-grow: 1;
+            align-content: start;
+            z-index: 1;
+        }
+        .pod {
+            background-color: var(--green);
+            height: 100px;
+            border-radius: 4px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.9rem;
+            font-weight: bold;
+            color: #000;
+            padding: 5px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+            text-align: center;
+        }
+        .pod.crashed {
+            background-color: var(--red);
+            color: white;
+            animation: shake 0.5s infinite;
+            border: 2px solid #ff8a80;
+        }
+        .pod-id { font-size: 0.7em; opacity: 0.8; margin-bottom: 5px; }
+
+        /* QR CODE SMALL (Header) */
+        #qrcode-header {
+            background: white;
+            padding: 5px;
+            border-radius: 4px;
+        }
+
+        /* --- OVERLAYS (Lobby & Outro) --- */
+        .overlay {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: #000;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 100;
+            transition: opacity 0.5s;
+        }
+        .overlay.hidden {
+            opacity: 0;
+            pointer-events: none;
+        }
+        
+        /* LOBBY STYLES */
+        #lobby-overlay h1 { font-size: 4rem; margin: 0 0 20px 0; color: var(--green); text-transform: uppercase; }
+        #lobby-overlay p { font-size: 1.5rem; color: #aaa; margin-bottom: 40px; }
+        #qrcode-lobby {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+        }
+        #lobby-url { font-size: 2rem; margin-top: 20px; font-weight: bold; color: var(--text); }
+
+        /* OUTRO STYLES */
+        #outro-overlay { background: rgba(0,0,0,0.95); }
+        #outro-overlay h1 { font-size: 3rem; color: var(--text); margin-bottom: 20px; text-align: center; max-width: 80%; }
+        #outro-overlay h2 { font-size: 2rem; color: var(--green); margin-bottom: 50px; }
+        .github-link {
+            font-size: 1.5rem; color: #fff; text-decoration: none; border: 2px solid #fff; padding: 20px 40px; border-radius: 50px;
+        }
+
+        /* CONTROLS */
+        .controls {
+            position: fixed;
+            bottom: 20px; right: 20px;
+            background: rgba(0,0,0,0.9);
+            padding: 15px;
+            border-radius: 8px;
+            opacity: 0;
+            transition: opacity 0.3s;
+            border: 1px solid #333;
+            z-index: 999;
+        }
+        .controls:hover { opacity: 1; }
+        button {
+            padding: 15px 30px;
+            font-size: 1.2rem;
+            cursor: pointer;
+            margin-left: 10px;
+            border: none;
+            border-radius: 4px;
+            font-weight: bold;
+            font-family: monospace;
+        }
+        .btn-chaos { background: var(--red); color: white; }
+        .btn-reset { background: var(--green); color: black; }
+        .btn-outro { background: #2196F3; color: white; }
+
+        @keyframes shake {
+            0% { transform: translate(1px, 1px) rotate(0deg); } 20% { transform: translate(-3px, 0px) rotate(1deg); } 40% { transform: translate(1px, -1px) rotate(1deg); } 60% { transform: translate(-3px, 1px) rotate(0deg); } 80% { transform: translate(-1px, -1px) rotate(1deg); } 100% { transform: translate(1px, -2px) rotate(-1deg); }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- OVERLAY: LOBBY -->
+    <div id="lobby-overlay" class="overlay">
+        <h1>Human Kubernetes</h1>
+        <p>Prendi il tuo smartphone e diventa un Nodo.</p>
+        <div id="qrcode-lobby"></div>
+        <div id="lobby-url">Scansiona per entrare</div>
+    </div>
+
+    <!-- OVERLAY: OUTRO -->
+    <div id="outro-overlay" class="overlay hidden">
+        <h1>"Kubernetes lavora per non farvi consumare il dito."</h1>
+        <h2>Grazie per aver salvato la produzione.</h2>
+        <div class="github-link">github.com/PartySlayer/human-k8s</div>
+    </div>
+
+    <!-- MAIN DASHBOARD -->
+    <header>
+        <div id="qrcode-header" title="Scan to Join"></div>
+        
+        <div class="sla-container">
+            <div class="sla-label">
+                <span>CLUSTER SLA</span>
+                <span id="sla-value">100%</span>
+            </div>
+            <div class="sla-bar-bg">
+                <div id="sla-fill" class="sla-bar-fill"></div>
+            </div>
+        </div>
+        
+        <div style="width: 80px;"></div> 
+    </header>
+
+    <div id="cluster-grid"></div>
+
+    <div class="controls">
+        <button class="btn-reset" onclick="triggerAction('admin_reset')">1. LOBBY / RESET</button>
+        <button class="btn-chaos" onclick="triggerAction('admin_start')">2. START CHAOS</button>
+        <button class="btn-outro" onclick="triggerAction('admin_outro')">3. OUTRO</button>
+
+        <button onclick="triggerAction('admin_stop')" style="background:#555;color:#fff;font-size:0.8rem">STOP (DEBUG)</button>
+    </div>
+
+    <!-- SOCKET.IO -->
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+        // --- QR CODE GENERATION --- 
+        const clientUrl = window.location.href.replace('dashboard.html', '').replace(/\/$/, "");
+        
+        // QR Code per la Lobby (GIGANTE)
+        if (typeof QRCode !== 'undefined') {
+            new QRCode(document.getElementById("qrcode-lobby"), {
+                text: clientUrl, width: 400, height: 400, colorDark : "#000000", colorLight : "#ffffff", correctLevel : QRCode.CorrectLevel.H
+            });
+            // QR Code per Header (PICCOLO)
+            new QRCode(document.getElementById("qrcode-header"), {
+                text: clientUrl, width: 80, height: 80, colorDark : "#000000", colorLight : "#ffffff", correctLevel : QRCode.CorrectLevel.L
+            });
+            document.getElementById('lobby-url').innerText = clientUrl;
+        }
+
+        // --- SOCKET LOGIC ---
+        if (typeof io !== 'undefined') {
+            const socket = io({ query: { role: 'dashboard' } });
+            
+            const lobbyOverlay = document.getElementById('lobby-overlay');
+            const outroOverlay = document.getElementById('outro-overlay');
+            const grid = document.getElementById('cluster-grid');
+            const slaValue = document.getElementById('sla-value');
+            const slaFill = document.getElementById('sla-fill');
+
+            window.triggerAction = function(action) {
+                socket.emit(action);
+            }
+
+            socket.on('dashboard_update', (data) => {
+                // 1. GESTIONE FASI (Lobby/Game/Outro)
+                if (data.phase === 'LOBBY') {
+                    lobbyOverlay.classList.remove('hidden');
+                    outroOverlay.classList.add('hidden');
+                    document.body.classList.remove('critical-alert');
+                } else if (data.phase === 'OUTRO') {
+                    lobbyOverlay.classList.add('hidden');
+                    outroOverlay.classList.remove('hidden');
+                    document.body.classList.remove('critical-alert');
+                } else {
+                    // PHASE: GAME
+                    lobbyOverlay.classList.add('hidden');
+                    outroOverlay.classList.add('hidden');
+                }
+
+                // 2. AGGIORNAMENTO SLA & ALLARME
+                slaValue.innerText = data.sla + '%';
+                slaFill.style.width = data.sla + '%';
+                
+                if(data.sla > 95) slaFill.style.backgroundColor = 'var(--green)';
+                else if(data.sla > 70) slaFill.style.backgroundColor = '#ffc107'; 
+                else slaFill.style.backgroundColor = 'var(--red)';
+
+                // Trigger Allarme Rosso se SLA < 30% (Solo in fase GAME)
+                if (data.phase === 'GAME' && data.sla < 30) {
+                    document.body.classList.add('critical-alert');
+                } else {
+                    document.body.classList.remove('critical-alert');
+                }
+
+                // 3. RENDER GRID
+                grid.innerHTML = '';
+                const sortedPlayers = data.players.sort((a,b) => a.name.localeCompare(b.name));
+                
+                if (sortedPlayers.length === 0) {
+                    if (data.phase === 'GAME') {
+                        grid.innerHTML = '<div style="color: gray; text-align: center; grid-column: 1/-1; margin-top: 50px; font-size: 1.5rem;">Waiting for nodes...</div>';
+                    }
+                } else {
+                    sortedPlayers.forEach(p => {
+                        const div = document.createElement('div');
+                        div.className = `pod ${p.status === 'red' ? 'crashed' : ''}`;
+                        const statusIcon = p.status === 'red' ? '💀' : '🟢';
+                        div.innerHTML = `
+                            <div class="pod-id">${p.name}</div>
+                            <div class="pod-status">${statusIcon}</div>
+                            ${p.status === 'red' ? `<div style="font-size:0.6rem; margin-top:5px;">${p.errorMsg.split(' ')[0]}</div>` : ''}
+                        `;
+                        grid.appendChild(div);
+                    });
+                }
+            });
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Human Kubelet</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            font-family: sans-serif;
+            overflow: hidden;
+            background: #222;
+        }
+        #pod-name {
+            background: #000;
+            color: #fff;
+            padding: 10px;
+            text-align: center;
+            font-family: monospace;
+            font-size: 1.2rem;
+        }
+        #action-btn {
+            flex-grow: 1;
+            border: none;
+            width: 100%;
+            font-size: 3rem;
+            font-weight: bold;
+            color: white;
+            transition: all 0.1s;
+            text-transform: uppercase;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            -webkit-tap-highlight-color: transparent;
+            /* Impedisce selezione testo su mobile */
+            user-select: none;
+        }
+        .status-running {
+            background-color: #4caf50;
+            /* Cliccare sul verde non deve sembrare un'azione attiva */
+            cursor: default;
+        }
+        .status-crashed {
+            background-color: #f44336;
+            animation: shake 0.5s;
+            cursor: pointer;
+        }
+        
+        .error-detail {
+            font-size: 1.2rem;
+            margin-top: 10px;
+            font-weight: normal;
+            font-family: monospace;
+        }
+
+        @keyframes shake {
+            0% { transform: translate(1px, 1px) rotate(0deg); }
+            10% { transform: translate(-1px, -2px) rotate(-1deg); }
+            20% { transform: translate(-3px, 0px) rotate(1deg); }
+            30% { transform: translate(3px, 2px) rotate(0deg); }
+            40% { transform: translate(1px, -1px) rotate(1deg); }
+            50% { transform: translate(-1px, 2px) rotate(-1deg); }
+            60% { transform: translate(-3px, 1px) rotate(0deg); }
+            70% { transform: translate(3px, 1px) rotate(-1deg); }
+            80% { transform: translate(-1px, -1px) rotate(1deg); }
+            90% { transform: translate(1px, 2px) rotate(0deg); }
+            100% { transform: translate(1px, -2px) rotate(-1deg); }
+        }
+    </style>
+</head>
+<body>
+    <div id="pod-name">Connessione...</div>
+    <button id="action-btn" class="status-running">Avvio...</button>
+
+    <!-- Socket IO -->
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+        // --- AUDIO ENGINE (Web Audio API) --- TOTALMENTE SCRITTO E COMMENTATO DA AI
+
+        // Usiamo un solo contesto audio globale
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        let audioCtx;
+
+        function initAudio() {
+            if (!audioCtx && AudioContext) {
+                audioCtx = new AudioContext();
+            }
+            // Su mobile il contesto parte in stato "suspended" e va attivato con un tocco
+            if (audioCtx && audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+        }
+
+        function playFixSound() {
+            if (!audioCtx) initAudio();
+            if (!audioCtx) return; // Fallback se non supportato
+
+            const osc = audioCtx.createOscillator();
+            const gainNode = audioCtx.createGain();
+
+            osc.connect(gainNode);
+            gainNode.connect(audioCtx.destination);
+
+            // Effetto "Power Up" / "Success"
+            // Onda quadra per un suono più "retro/digital"
+            osc.type = 'square'; 
+            
+            // Pitch sale rapidamente da 220Hz a 880Hz (un'ottava)
+            osc.frequency.setValueAtTime(220, audioCtx.currentTime);
+            osc.frequency.exponentialRampToValueAtTime(880, audioCtx.currentTime + 0.1);
+
+            // Volume fade out rapido
+            gainNode.gain.setValueAtTime(0.1, audioCtx.currentTime);
+            gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.1);
+
+            osc.start();
+            osc.stop(audioCtx.currentTime + 0.1);
+        }
+
+        // --- GAME LOGIC ---  PARTE AUDIO VIBRAZIONI GENERATA E COMMENTATA DA AI
+
+        const socket = io();
+        const btn = document.getElementById('action-btn');
+        const nameDisplay = document.getElementById('pod-name');
+        
+        let isCrashed = false;
+
+        socket.on('init_player', (data) => {
+            nameDisplay.innerText = "POD: " + data.name;
+            setRunning();
+        });
+
+        socket.on('pod_crash', (errorMsg) => {
+            isCrashed = true;
+            btn.className = 'status-crashed';
+            btn.innerHTML = `CRASHED!<div class="error-detail">${errorMsg}</div>`; 
+            
+            // Vibrazione (Haptic Feedback)
+            if (navigator.vibrate) navigator.vibrate([50, 50, 50]); // Pattern "errore"
+        });
+
+        socket.on('pod_running', () => {
+            setRunning();
+        });
+
+        function setRunning() {
+            isCrashed = false;
+            btn.className = 'status-running';
+            btn.innerHTML = "RUNNING";
+        }
+
+        btn.addEventListener('click', () => {
+            // Inizializza audio al primo click (necessario per policy browser)
+            initAudio();
+
+            if (isCrashed) {
+                // 1. Emette suono riparazione
+                playFixSound();
+                
+                // 2. Logica Socket
+                socket.emit('restart_pod');
+                
+                // 3. Feedback visivo immediato (Optimistic UI)
+                btn.innerHTML = "STARTING...";
+                
+                // 4. Vibrazione leggera di conferma
+                if (navigator.vibrate) navigator.vibrate(20); 
+            }
+        });
+        
+        // Tentativo di init audio al primo tocco ovunque, per sicurezza
+        document.body.addEventListener('touchstart', initAudio, { once: true });
+        document.body.addEventListener('click', initAudio, { once: true });
+
+    </script>
+</body>
+</html>
