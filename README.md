@@ -37,6 +37,9 @@ I crash appaiono istantaneamente su 100+ dispositivi.
 
 ---
 
+![human-k8s-architecture](https://github.com/user-attachments/assets/df173d22-cef2-41f2-a35f-45ba4feee682)
+
+
 ## 🛠️ Quick Start (Setup Locale)
 
 ### Prerequisiti
