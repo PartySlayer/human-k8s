@@ -20,7 +20,7 @@ Durante il talk, lo speaker diventa il **Chaos Engineer** e il pubblico diventa 
 
 2. **Lo Speaker:** Avvia il *Chaos Engine* che simula guasti di rete e OOMKilled.
 
-3. **La Missione:** Il pubblico deve agire come una *Liveness Probe* umana, riavviando manualmente i propri pod per mantenere l'SLA del cluster sopra il 90%.
+3. **La Missione:** Il pubblico deve agire da Kubelet umano: quando la Liveness Probe segnala un guasto, l'utente deve eseguire il loop di riconciliazione riavviando i propri pod.
 
 ## ✨ Features
 
@@ -45,7 +45,7 @@ I crash appaiono istantaneamente su 100+ dispositivi.
 ### Prerequisiti
 
 * Node.js (v14 o superiore)
-* Tutti i dispositivi (Speaker + Pubblico) devono essere sulla stessa rete LAN/Wi-Fi.
+* Tutti i dispositivi (Speaker + Pubblico) devono essere sulla stessa rete LAN/Wi-Fi
 * (opzionale) Ngrok
 
 ### Installazione
