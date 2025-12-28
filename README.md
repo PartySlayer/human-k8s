@@ -16,11 +16,11 @@ Invece di spiegare concetti complessi con diagrammi statici, questa web-app tras
 
 Durante il talk, lo speaker diventa il **Chaos Engineer** e il pubblico diventa l'infrastruttura.
 
-1. **Il Pubblico**: Si connette via smartphone. Ogni telefono è un Pod che può crashare.
+1. **Il Pubblico**: Si connette via smartphone. Ogni telefono è un Nodo, al suo interno c'è un pod contenente un container che può crashare.
 
 2. **Lo Speaker:** Avvia il *Chaos Engine* che simula guasti di rete e OOMKilled.
 
-3. **La Missione:** Il pubblico deve agire da Kubelet umano: quando la Liveness Probe segnala un guasto, l'utente deve eseguire il loop di riconciliazione riavviando i propri pod.
+3. **La Missione:** Il pubblico deve agire da Kubelet umano: quando la Liveness Probe segnala un guasto, l'utente deve eseguire il loop di riconciliazione tappando sullo schermo.
 
 ## ✨ Features
 
@@ -95,9 +95,9 @@ Questo progetto è strutturato in **3 Fasi** controllabili direttamente dalla Da
 ### 1. 🔴 GAME MODE (Il Caos)
 
 * **Azione:** `START CHAOS` sulla Dashboard.
-* **Cosa succede:** Il 10% dei pod crasha ogni secondo con errori reali (`SegFault`, `DiskPressure`).
-* **Obiettivo:** Il pubblico deve cliccare ("fixare") freneticamente per tenere la barra SLA verde.
-* **Takeaway:** Far sentire la "fatica" fisica del Reconciliation Loop.
+* **Cosa succede:** Il 10% dei pod crasha ogni secondo con errori reali (`CrashLoopBackOff`, `SegFault`).
+* **Obiettivo:** Il pubblico deve tappare sullo schermo per mantenere la barra SLA verde.
+* **Takeaway:** Far sentire fisicamente la "fatica" del Reconciliation Loop.
 
 ### 2. 💀 DRIFT (Il Silenzio)
 
